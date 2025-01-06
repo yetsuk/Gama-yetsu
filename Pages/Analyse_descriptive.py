@@ -42,7 +42,7 @@ L'algorithme renvoit alors une analyse globale du subreddit. ''')
 
 # --- Initialisation de l'accès à l'API ---
 try:
-    reddit = praw.Reddit(client_id =  os.getenv('clien_id'), 
+    reddit = praw.Reddit(client_id =  os.getenv('client_id'), 
                      client_secret = os.getenv('client_secret'),
                      user_agent = os.getenv('user_agent'))
     
