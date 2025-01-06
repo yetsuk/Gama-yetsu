@@ -57,7 +57,7 @@ st.write('''
 
 # --- Ajout Instance de connexion Reddit --- 
 try:
-    reddit = praw.Reddit(client_id =  os.getenv('clien_id'), 
+    reddit = praw.Reddit(client_id =  os.getenv('client_id'), 
                      client_secret = os.getenv('client_secret'),
                      user_agent = os.getenv('user_agent'))
     
