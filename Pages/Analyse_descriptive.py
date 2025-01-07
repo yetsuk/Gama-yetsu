@@ -54,9 +54,7 @@ except Exception as e:
 ############################################################
 
 # --- Affiche l'entête de la communauté
-def show_subreddit_header(communaute):
-    subreddit = reddit.subreddit(communaute)
-
+def show_subreddit_header(subreddit):
     # Afficher les informations du subreddit
     st.write(f"Nom affiché : {subreddit.display_name}")
     st.write(f"Description : {subreddit.public_description}")
@@ -65,7 +63,7 @@ def show_subreddit_header(communaute):
         
 # --- Extraction des posts ---
 def extract_into_df(subreddit):
-    posts = subreddit.top(limit=None)  
+    posts = subreddit.top(limit=100)  
     posts_dict = {
         'Auteur': [], "Title": [], "Post Text": [], "ID": [],
         "Score": [], "Total Comments": [], "Post URL": [], "Date": []
@@ -83,16 +81,16 @@ def extract_into_df(subreddit):
         posts_dict["Post URL"].append(post.url)
         posts_dict["Date"].append(datetime.fromtimestamp(post.created_utc))
 
-        top_posts = pd.DataFrame(posts_dict)
-        top_posts = top_posts.drop_na(subset = ['Auteur'])
+    top_posts = pd.DataFrame(posts_dict)
+    top_posts = top_posts.dropna(subset = ['Auteur'])
 
-    return st.write("Données des posts récupérées avec succès !")
+    return top_posts
 
 
 
 # --- Analyse statistique ---
 
-def stats_analysis(top_posts, communaute):
+def stats_analysis(top_posts):
         nb_publications = len(top_posts)
         nb_auteurs = top_posts['Auteur'].nunique()
         ratio_pub_auteur = round(nb_publications / nb_auteurs, 2)
@@ -168,11 +166,13 @@ def rythme_publication(top_posts):
 # --- Accès information subreddit
 subname = st.text_input('Saisir le nom de la communauté')
 
-communaute = reddit.subreddit(subname)
 
 
-if communaute:
+if subname:
     try:
+        # Débute le code si subname existe
+        communaute = reddit.subreddit(subname)
+
         st.title('Information générale du subreddit !')
         show_subreddit_header(communaute)
 
