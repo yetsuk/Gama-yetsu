@@ -5,8 +5,6 @@ import praw
 import numpy as np
 import pandas as pd
 from datetime import datetime
-import spacy
-from langdetect import detect, LangDetectException
 
 # Visualisation de donnée
 import statsmodels as stats
@@ -50,82 +48,102 @@ except Exception as e:
     st.error("Erreur de connexion à l'API Reddit. Veuillez vérifier vos identifiants.")
     st.stop()
 
-# --- Début de l'algorithme ---
 
-# Sélection du subreddit
-communaute = st.text_input("Veuillez écrire le nom du subreddit (sans le 'r/')")
+############################################################
+#--- Définition des fonctions pour analyse descriptive ---
+############################################################
 
+# --- Affiche l'entête de la communauté
+def show_subreddit_header(communaute):
+    subreddit = reddit.subreddit(communaute)
 
-# --- Extractions des posts ---
-
-# Vérification si un nom de subreddit a été saisi
-if communaute:
-    try:
-        subreddit = reddit.subreddit(communaute)
-
-        # Afficher les informations du subreddit
-        st.write(f"Nom affiché : {subreddit.display_name}")
-        st.write(f"Description : {subreddit.public_description}")
-        st.write(f"Date de création : {datetime.fromtimestamp(subreddit.created_utc)}")
-        st.write(f"Le subreddit '{subreddit.display_name}' compte actuellement : {subreddit.subscribers} abonnés.")
+    # Afficher les informations du subreddit
+    st.write(f"Nom affiché : {subreddit.display_name}")
+    st.write(f"Description : {subreddit.public_description}")
+    st.write(f"Date de création : {datetime.fromtimestamp(subreddit.created_utc)}")
+    st.write(f"Le subreddit '{subreddit.display_name}' compte actuellement : {subreddit.subscribers} abonnés.")
         
-        # --- Extraction des posts ---
-        posts = subreddit.top(limit=None)  
-        posts_dict = {
-            'Auteur': [], "Title": [], "Post Text": [], "ID": [],
-            "Score": [], "Total Comments": [], "Post URL": [], "Date": []
-        }
+# --- Extraction des posts ---
+def extract_into_df(subreddit):
+    posts = subreddit.top(limit=None)  
+    posts_dict = {
+        'Auteur': [], "Title": [], "Post Text": [], "ID": [],
+        "Score": [], "Total Comments": [], "Post URL": [], "Date": []
+    }
 
-        # Extraction des informations de chaque post
-        for post in posts:
-            posts_dict['Auteur'].append(post.author.name if post.author else "N/A")
-            posts_dict["Title"].append(post.title)
-            posts_dict["ID"].append(post.id)
-            posts_dict["Post Text"].append(post.selftext)
-            posts_dict["Score"].append(post.score)
-            posts_dict["Total Comments"].append(post.num_comments)
-            posts_dict["Post URL"].append(post.url)
-            posts_dict["Date"].append(datetime.fromtimestamp(post.created_utc))
+    # Extraction des informations de chaque post
+
+    for post in posts:
+        posts_dict['Auteur'].append(post.author.name if post.author else "N/A")
+        posts_dict["Title"].append(post.title)
+        posts_dict["ID"].append(post.id)
+        posts_dict["Post Text"].append(post.selftext)
+        posts_dict["Score"].append(post.score)
+        posts_dict["Total Comments"].append(post.num_comments)
+        posts_dict["Post URL"].append(post.url)
+        posts_dict["Date"].append(datetime.fromtimestamp(post.created_utc))
 
         top_posts = pd.DataFrame(posts_dict)
         top_posts = top_posts.drop_na(subset = ['Auteur'])
-        st.write("Données des posts récupérées avec succès !")
 
-        # --- Analyse statistique ---
-        st.header('Informations principales')
+    return st.write("Données des posts récupérées avec succès !")
+
+
+
+# --- Analyse statistique ---
+
+def stats_analysis(top_posts, communaute):
         nb_publications = len(top_posts)
         nb_auteurs = top_posts['Auteur'].nunique()
         ratio_pub_auteur = round(nb_publications / nb_auteurs, 2)
 
-        stat_post = pd.DataFrame({
+        statistics = pd.DataFrame({
             'Statistiques': ['Nombre de publications', "Nombre d'auteurs", 'Ratio Publication / Auteur'],
             'Valeurs': [nb_publications, nb_auteurs, ratio_pub_auteur]
         })
+        st.dataframe(statistics)
 
-        st.write(f'Voici les statistiques principales du subreddit {communaute}')
-        st.dataframe(stat_post)
 
-        # --- Top 5 Auteurs ---
-        top_auteurs = top_posts['Auteur'].value_counts().head(5).reset_index()
-        top_auteurs.columns = ['Auteur', 'Nombre de publications']
-        st.write('Voici les 5 membres ayant publié le plus')
-        st.dataframe(top_auteurs)
 
-        # --- Description des variables Score et Total Comments ---
-        st.header('Description des variables Score et Commentaires')
-        for var in ['Score', 'Total Comments']:
-            stat_df = pd.DataFrame({
-                "Statistiques": ["Moyenne", "Médiane", "Écart-type", "Minimum", "Maximum", "Premier quartile (Q1)", "Troisième quartile (Q3)"],
-                "Valeurs": [
-                    top_posts[var].mean().round(2), top_posts[var].median(), top_posts[var].std().round(2),
-                    top_posts[var].min(), top_posts[var].max(),
-                    top_posts[var].quantile(0.25), top_posts[var].quantile(0.75)
-                ]
-            })
-            st.write(f'Description de la variable {var}')
-            st.dataframe(stat_df)
+# --- Top 5 Auteurs ---
+def print_top5(top_posts):
+    top_auteurs = top_posts['Auteur'].value_counts().head(5).reset_index()
+    top_auteurs.columns = ['Auteur', 'Nombre de publications']
+    st.write('Voici les 5 membres ayant publié le plus')
+    st.dataframe(top_auteurs)
 
-        # --- Rythme de publication dans le temps ---
+
+# --- Description des variables Score et Total Comments ---
+def describe_score_comments(top_posts):
+
+    # Initialisation d'un dictionnaire pour stocker les statistiques
+    stats = {
+        "Statistiques": ["Moyenne", "Médiane", "Écart-type", "Minimum", "Maximum", 
+                         "Premier quartile (Q1)", "Troisième quartile (Q3)"]
+    }
+
+    # Calcul des statistiques pour chaque variable et ajout au dictionnaire
+    for var in ['Score', 'Total Comments']:
+        stats[var] = [
+            top_posts[var].mean().round(2), 
+            top_posts[var].median(), 
+            top_posts[var].std().round(2),
+            top_posts[var].min(), 
+            top_posts[var].max(),
+            top_posts[var].quantile(0.25), 
+            top_posts[var].quantile(0.75)
+        ]
+
+    # Conversion du dictionnaire en DataFrame
+    combined_stats = pd.DataFrame(stats)
+
+    # Affichage du tableau combiné
+    st.dataframe(combined_stats)
+
+
+
+# --- Rythme de publication dans le temps ---
+def rythme_publication(top_posts):
         top_posts['Date'] = pd.to_datetime(top_posts['Date']).dt.to_period('M')
         df_count = top_posts.groupby('Date').size().reset_index(name='Nombre de posts')
 
@@ -140,8 +158,48 @@ if communaute:
         plt.tight_layout()
 
         # Afficher le plot
-        st.write('Nombre de post publié par mois')
         st.pyplot(fig)
 
+
+##############################
+# --- Début de l'algorithme
+##############################
+
+# --- Accès information subreddit
+subname = st.text_input('Saisir le nom de la communauté')
+
+communaute = reddit.subreddit(subname)
+
+
+if communaute:
+    try:
+        st.title('Information générale du subreddit !')
+        show_subreddit_header(communaute)
+
+        # Extraction des posts Reddit
+        post_reddit = extract_into_df(communaute)
+        st.write('Publication Reddit extraites avec Succès')
+
+
+        # --- Analyse Statistique ---
+        st.header(f'Analyse Statistique de la communauté {communaute}')
+        st.write(f"Voici quelsques informations statistiques")
+        stats_analysis(post_reddit)
+
+        # Top 5 Auteur
+        st.header('Top 5 Auteur')
+        st.write('Voici les auteurs les auteurs les plus actifs')
+        print_top5(post_reddit)
+
+        # Description Score / Commentaire
+        st.header('Description du score et du nombre de commentaire')
+        describe_score_comments(post_reddit)
+
+        # Rythme de publication dans le temps
+        st.header('Rythme de publication')
+        st.write("Rythme de publication de la communauté")
+        rythme_publication(post_reddit)
+
+
     except Exception as e:
-        st.error("Erreur lors de la récupération des informations du subreddit. Veuillez vérifier le nom ou réessayer plus tard.")
+         st.error("Erreur lors de la récupération des informations du subreddit. Veuillez vérifier le nom ou réessayer plus tard.")
