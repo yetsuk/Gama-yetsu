@@ -209,6 +209,10 @@ st.header('A vous de le tester !')
 choix_extract = st.radio("Veuillez choisir le type d'extraction souhaitez !",
                          ['Publication Subreddit', 'Commentaire', 'Query'])
 
+
+# Initialisation variable publication
+df_post = None
+
 st.write(f'Vous avez choisis: {choix_extract}')
 st.divider()
 
@@ -225,16 +229,23 @@ if choix_extract == 'Publication Subreddit':
     communaute = st.text_input('Veullez écrire le noms du subreddit sans le "r/" !')
     st.divider()
 
-    if communaute:
-        st.subheader(communaute)
-        # Retourne des informations sur la communauté
-        display_info(communaute)
-        try:
-            df_post = extract_post(communaute, choix_corpus)
+    # Ajout du bouton de validation
+    if st.button('Validez'):
 
-        except Exception as e:
-            st.error("Erreur lors de la récupération des informations du subreddit. Veuillez vérifier le nom ou réessayer plus tard.")
-    
+        if communaute:
+            st.success('Analyse en cours')
+            st.subheader(communaute)
+            # Retourne des informations sur la communauté
+            display_info(communaute)
+            try:
+                df_post = extract_post(communaute, choix_corpus)
+
+            except Exception as e:
+                st.error("Erreur lors de la récupération des informations du subreddit. Veuillez vérifier le nom ou réessayer plus tard.")
+
+        
+    else:
+        st.write('Veuillez cliquer sur le bouton pour valider !')
 
 
 elif choix_extract == 'Commentaire':
@@ -247,33 +258,46 @@ elif choix_extract == 'Commentaire':
 
         link = st.text_input('Veuillez ajoutez le lien du post à analyser !')
 
-        if link:
-            try:
-                # Extraction ID
-                id_post = from_link_get_id(link)
+        if st.button('Validez'):
 
-                # Extraire la publication Reddit
-                post = reddit.submission(id = id_post)
+            if link:
+                st.success('Analyse en cours')
+                try:
+                    # Extraction ID
+                    id_post = from_link_get_id(link)
 
-                # Extraction des commentaires
-                df_post = extract_comment(post)
+                    # Extraire la publication Reddit
+                    post = reddit.submission(id = id_post)
 
-            except Exception as e:
-                st.error("Erreur lors de la récupération des informations du subreddit. Veuillez vérifier le nom ou réessayer plus tard.")
+                    # Extraction des commentaires
+                    df_post = extract_comment(post)
+
+                except Exception as e:
+                    st.error("Erreur lors de la récupération des informations du subreddit. Veuillez vérifier le nom ou réessayer plus tard.")
+
+        else:
+            st.write('Veuillez cliquer sur le bouton pour valider !')    
+
 
     else:
         id_post = st.text_input("Veuillez ajoutez l'ID de la publication !")
-
-        if id_post:
-            try:
-
-                post = reddit.submission(id = id_post)
-            
-                df_post = extract_comment(post)
         
-            except Exception as e:
-                st.error("Erreur lors de la récupération des informations du subreddit. Veuillez vérifier le nom ou réessayer plus tard.")
 
+        if st.button('Validez'):
+
+            if id_post:
+                st.succes('Analyse en cours')
+                try:
+
+                    post = reddit.submission(id = id_post)
+            
+                    df_post = extract_comment(post)
+        
+                except Exception as e:
+                    st.error("Erreur lors de la récupération des informations du subreddit. Veuillez vérifier le nom ou réessayer plus tard.")
+
+        else:
+            st.write('Veuillez cliquer sur le bouton pour valider !') 
 
 else: #Query
     
@@ -282,75 +306,81 @@ else: #Query
     query = st.text_input('Veullez écrire le terme à rechercher !')
     st.divider()
 
-    if query:
-        st.subheader(f'Recherche de publication correspondant à "{query}"')
-        # Retourne des informations sur la communauté
-        try:
-            df_post = from_query_get_post(query)
+    if st.button('Validez'):
+
+        if query:
+            # Ecrit un message pour avertir du début de la recherche
+            st.succes('Analyse en cours')
+            st.subheader(f'Recherche de publication correspondant à "{query}"')
+            # Retourne des informations sur la communauté
+            try:
+                df_post = from_query_get_post(query)
 
 
-        except Exception as e:
-            st.error("Erreur lors de la récupération des informations du subreddit. Veuillez vérifier le nom ou réessayer plus tard.")
+            except Exception as e:
+                st.error("Erreur lors de la récupération des informations du subreddit. Veuillez vérifier le nom ou réessayer plus tard.")
 
+    else:
+        st.write('Veuillez cliquer sur le bouton pour valider !') 
 
-st.divide
+st.divider() 
 #########################
 #    Analyse du texte   #
 #########################
 
 # Variable texte à analyser
+if df_post:
+    text = df_post['Texte']
 
-text = df_post['Texte']
+    nltk.download('stopwords')
 
-nltk.download('stopwords')
+    lang = detect(text)
 
-lang = detect(text)
+    if lang == 'fr':
+        stop_words = stopwords.words('french')
+        nlp = spacy.load('fr_core_nexs_sm', disable=['parser', 'ner'])
 
-if lang == 'fr':
-    stop_words = stopwords.words('french')
-    nlp = spacy.load('fr_core_nexs_sm', disable=['parser', 'ner'])
+    else:
+        stop_words = stopwords.words('english')
+        nlp = spacy.load('en_core_web_sm')
 
-else:
-    stop_words = stopwords.words('english')
-    nlp = spacy.load('en_core_web_sm')
+    # Preprocessing du texte à analyser
+    def preprocess_text(text):
+        text = re.sub('\s+', ' ', text)  # Remove extra spaces
+        text = re.sub('\S*@\S*\s?', '', text)  # Remove emails
+        text = re.sub('\'', '', text)  # Remove apostrophes
+        text = re.sub('[^a-zA-Z]', ' ', text)  # Remove non-alphabet characters
+        text = text.lower()  # Convert to lowercase
+        return text
 
-# Preprocessing du texte à analyser
-def preprocess_text(text):
-    text = re.sub('\s+', ' ', text)  # Remove extra spaces
-    text = re.sub('\S*@\S*\s?', '', text)  # Remove emails
-    text = re.sub('\'', '', text)  # Remove apostrophes
-    text = re.sub('[^a-zA-Z]', ' ', text)  # Remove non-alphabet characters
-    text = text.lower()  # Convert to lowercase
-    return text
-
-df_post['cleaned_text'] = df_post['Title'].apply(preprocess_text)  # Replace 'text_column' with your column name
+    df_post['cleaned_text'] = df_post['Title'].apply(preprocess_text)  # Replace 'text_column' with your column name
 
 
-# Tokenize and retire stopwords
-def tokenize(text):
-    tokens = gensim.utils.simple_preprocess(text, deacc=True)
-    tokens = [token for token in tokens if token not in stop_words]
-    return tokens
+    # Tokenize and retire stopwords
+    def tokenize(text):
+        tokens = gensim.utils.simple_preprocess(text, deacc=True)
+        tokens = [token for token in tokens if token not in stop_words]
+        return tokens
 
-df_post['tokens'] = df_post['cleaned_text'].apply(tokenize)
+    df_post['tokens'] = df_post['cleaned_text'].apply(tokenize)
 
-# Lemmatization des tokens
-nlp = spacy.load('fr_core_news_sm', disable=['parser', 'ner'])
-def lemmatize(tokens):
-    doc = nlp(" ".join(tokens))
-    return [token.lemma_ for token in doc]
+    # Lemmatization des tokens
+    nlp = spacy.load('fr_core_news_sm', disable=['parser', 'ner'])
+    def lemmatize(tokens):
+        doc = nlp(" ".join(tokens))
+        return [token.lemma_ for token in doc]
 
-df_post['lemmas'] = df_post['tokens'].apply(lemmatize)
+    df_post['lemmas'] = df_post['tokens'].apply(lemmatize)
 
-# Création dictionnaire et corpus
-id2word = corpora.Dictionary(df_post['lemmas'])
-texts = df_post['lemmas']
-corpus = [id2word.doc2bow(text) for text in texts]
+    # Création dictionnaire et corpus
+    id2word = corpora.Dictionary(df_post['lemmas'])
+    texts = df_post['lemmas']
+    corpus = [id2word.doc2bow(text) for text in texts]
 
-# LDA model
-num_topics = st.slider("Nombre de thèmes à identifier :", min_value=2, max_value=10, value=3)
+    # LDA model
+    num_topics = st.slider("Nombre de thèmes à identifier :", min_value=2, max_value=10, value=3)
 
-lda_model = gensim.models.ldamodel.LdaModel(corpus=corpus,
+    lda_model = gensim.models.ldamodel.LdaModel(corpus=corpus,
                                             id2word=id2word,
                                             random_state=100,
                                             update_every=1,
@@ -360,7 +390,7 @@ lda_model = gensim.models.ldamodel.LdaModel(corpus=corpus,
                                             per_word_topics=True)
 
 # Génération de la visualisation pyLDAvis
-if st.button("Afficher la visualisation LDA"):
-    vis_html = pyLDAvis.gensim_models.prepare(lda_model, corpus, id2word)
-    html_string = pyLDAvis.prepared_data_to_html(vis_html)
-    st.components.v1.html(html_string, width=1300, height=800, scrolling=True)
+    if st.button("Afficher la visualisation LDA"):
+        vis_html = pyLDAvis.gensim_models.prepare(lda_model, corpus, id2word)
+        html_string = pyLDAvis.prepared_data_to_html(vis_html)
+        st.components.v1.html(html_string, width=1300, height=800, scrolling=True)
