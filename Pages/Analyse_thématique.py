@@ -1,5 +1,29 @@
 # --- Analyse Textuelle Reddit ---
 
+
+# --- Import des modules nécessaire ---
+
+import pandas as pd
+import gensim
+import gensim.corpora as corpora
+import spacy
+import nltk
+from nltk.corpus import stopwords
+import re
+from datetime import datetime
+
+from langdetect import detect 
+
+import pyLDAvis
+import pyLDAvis.gensim_models
+
+import streamlit as st
+import praw
+
+
+
+
+
 # --- Accès code d'accès API
 from dotenv import load_dotenv ## Accès au fichier .env
 import os
@@ -11,32 +35,7 @@ dotenv_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=dotenv_path)
 
 
-# --- Importation des Modules ---
-import streamlit as st
-## MAnipulation des données
-import pandas as pd
-import numpy as np
 
-## Extractions des données
-import praw
-
-## Text Mining
-import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.neighbors import NearestNeighbors
-from sklearn.cluster import DBSCAN
-from collections import Counter
-from sklearn.decomposition import PCA
-from datetime import datetime
-
-
-## Visualisation de données
-from wordcloud import WordCloud
-import matplotlib.pyplot as plt
-
-# Nettoyage des donnéees
-import spacy
-from langdetect import detect, LangDetectException
 
 
 st.title('Analyse textuelle Reddit')
@@ -144,8 +143,6 @@ def display_post_info(post):
 
 # Nettoyage des liens
 def from_link_get_id(link):
-     #Tentative d'extraction des commentaires
-    link = st.text_input("Veuillez écrire le lien du post")
 
     # Nettoyage du lien pour obtenir l'id du post
     if link:
@@ -171,7 +168,7 @@ def extract_comment(post):
     for comment in all_comments:
         comments_dict[comment.id] = {
             'comment_author': comment.author.name if comment.author else '[deleted]',
-            'comment_body': comment.body}
+            'Texte': comment.body}
 
     # Création d'une Dataframe pour y ajouter les commentaires et les différentes caractéristiques associés
     comment_df = pd.DataFrame(comments_dict)
@@ -186,7 +183,7 @@ def from_query_get_post(query):
             subreddit = reddit.subreddit("all")  # Recherche dans tout Reddit, ou spécifie un subreddit
 
             # Extraire les publications contenant le terme recherché
-            post_dict = {'Titre': [], 'Texte': [], 'Score': [], "Nombre_Commentaire": [] }
+            post_dict = {'Auteur': [], 'Texte': []}
             for submission in subreddit.search(query, limit=10):  # Ajuste le "limit" pour plus ou moins de résultats
                 post_dict['Auteur'].append(submission.author)
 
@@ -197,3 +194,173 @@ def from_query_get_post(query):
             comment_df = pd.DataFrame(post_dict)
 
             return comment_df    
+
+
+st.divider()
+
+##################################
+#   Construction de l'analyse    #
+##################################
+
+st.header('A vous de le tester !')
+
+# --- Choix objet d'analyse ---
+
+choix_extract = st.radio("Veuillez choisir le type d'extraction souhaitez !",
+                         ['Publication Subreddit', 'Commentaire', 'Query'])
+
+st.write(f'Vous avez choisis: {choix_extract}')
+st.divider()
+
+
+if choix_extract == 'Publication Subreddit':
+    ## Sélection du type de corpus souhaiter    
+    choix_corpus = st.radio('Veuillez choisir les textes à analyser !', ['Titre', 'Contenu de publication'])
+
+    st.write(f"Vous avez choisi d'analyser les {choix_corpus}")
+
+    st.divider()
+
+     # Extraction des publications de subreddit
+    communaute = st.text_input('Veullez écrire le noms du subreddit sans le "r/" !')
+    st.divider()
+
+    if communaute:
+        st.subheader(communaute)
+        # Retourne des informations sur la communauté
+        display_info(communaute)
+        try:
+            df_post = extract_post(communaute, choix_corpus)
+
+        except Exception as e:
+            st.error("Erreur lors de la récupération des informations du subreddit. Veuillez vérifier le nom ou réessayer plus tard.")
+    
+
+
+elif choix_extract == 'Commentaire':
+    ## Sélection de la source Souhaiter
+    list_source = ['Lien', 'N° Identification']
+    choix_source = st.radio('Veuillez Choisir la source qui va vous servir de requête', list_source)
+    st.write(f'Vous avez choisis: {choix_source}')
+
+    if choix_source == 'Lien':
+
+        link = st.text_input('Veuillez ajoutez le lien du post à analyser !')
+
+        if link:
+            try:
+                # Extraction ID
+                id_post = from_link_get_id(link)
+
+                # Extraire la publication Reddit
+                post = reddit.submission(id = id_post)
+
+                # Extraction des commentaires
+                df_post = extract_comment(post)
+
+            except Exception as e:
+                st.error("Erreur lors de la récupération des informations du subreddit. Veuillez vérifier le nom ou réessayer plus tard.")
+
+    else:
+        id_post = st.text_input("Veuillez ajoutez l'ID de la publication !")
+
+        if id_post:
+            try:
+
+                post = reddit.submission(id = id_post)
+            
+                df_post = extract_comment(post)
+        
+            except Exception as e:
+                st.error("Erreur lors de la récupération des informations du subreddit. Veuillez vérifier le nom ou réessayer plus tard.")
+
+
+else: #Query
+    
+
+     # Extraction des publications de subreddit
+    query = st.text_input('Veullez écrire le terme à rechercher !')
+    st.divider()
+
+    if query:
+        st.subheader(f'Recherche de publication correspondant à "{query}"')
+        # Retourne des informations sur la communauté
+        try:
+            df_post = from_query_get_post(query)
+
+
+        except Exception as e:
+            st.error("Erreur lors de la récupération des informations du subreddit. Veuillez vérifier le nom ou réessayer plus tard.")
+
+
+st.divide
+#########################
+#    Analyse du texte   #
+#########################
+
+# Variable texte à analyser
+
+text = df_post['Texte']
+
+nltk.download('stopwords')
+
+lang = detect(text)
+
+if lang == 'fr':
+    stop_words = stopwords.words('french')
+    nlp = spacy.load('fr_core_nexs_sm', disable=['parser', 'ner'])
+
+else:
+    stop_words = stopwords.words('english')
+    nlp = spacy.load('en_core_web_sm')
+
+# Preprocessing du texte à analyser
+def preprocess_text(text):
+    text = re.sub('\s+', ' ', text)  # Remove extra spaces
+    text = re.sub('\S*@\S*\s?', '', text)  # Remove emails
+    text = re.sub('\'', '', text)  # Remove apostrophes
+    text = re.sub('[^a-zA-Z]', ' ', text)  # Remove non-alphabet characters
+    text = text.lower()  # Convert to lowercase
+    return text
+
+df_post['cleaned_text'] = df_post['Title'].apply(preprocess_text)  # Replace 'text_column' with your column name
+
+
+# Tokenize and retire stopwords
+def tokenize(text):
+    tokens = gensim.utils.simple_preprocess(text, deacc=True)
+    tokens = [token for token in tokens if token not in stop_words]
+    return tokens
+
+df_post['tokens'] = df_post['cleaned_text'].apply(tokenize)
+
+# Lemmatization des tokens
+nlp = spacy.load('fr_core_news_sm', disable=['parser', 'ner'])
+def lemmatize(tokens):
+    doc = nlp(" ".join(tokens))
+    return [token.lemma_ for token in doc]
+
+df_post['lemmas'] = df_post['tokens'].apply(lemmatize)
+
+# Création dictionnaire et corpus
+id2word = corpora.Dictionary(df_post['lemmas'])
+texts = df_post['lemmas']
+corpus = [id2word.doc2bow(text) for text in texts]
+
+# LDA model
+num_topics = st.slider("Nombre de thèmes à identifier :", min_value=2, max_value=10, value=3)
+
+lda_model = gensim.models.ldamodel.LdaModel(corpus=corpus,
+                                            id2word=id2word,
+                                            random_state=100,
+                                            update_every=1,
+                                            chunksize=100,
+                                            passes=10,
+                                            alpha='auto',
+                                            per_word_topics=True)
+
+# Génération de la visualisation pyLDAvis
+if st.button("Afficher la visualisation LDA"):
+    vis_html = pyLDAvis.gensim_models.prepare(lda_model, corpus, id2word)
+    html_string = pyLDAvis.prepared_data_to_html(vis_html)
+    st.components.v1.html(html_string, width=1300, height=800, scrolling=True)
