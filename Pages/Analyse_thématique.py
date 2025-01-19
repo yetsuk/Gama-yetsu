@@ -20,6 +20,9 @@ import pyLDAvis.gensim_models
 import streamlit as st
 import praw
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 
 
 
@@ -94,7 +97,10 @@ def choix_source():
 
 
 # --- Extraction des publications Reddit ---
-def extract_post(subreddit, choix_corpus):
+def extract_post(communaute, choix_corpus):
+
+    subreddit = reddit.subreddit(communaute)
+
     corpus = choix_corpus
 
     sub_posts = subreddit.top(limit = 10)
@@ -104,22 +110,18 @@ def extract_post(subreddit, choix_corpus):
 
     if corpus == 'Titre':
         for post in sub_posts:
-            post_dict['Post_ID'].append(post.id)
-            post_dict['Texte'].append(post.title)
+            post_dict['Post_ID'].append(post.id if post.id else "")
+            post_dict['Texte'].append(post.title if post.title else "")
 
-            df_post = pd.DataFrame(post_dict)
-        
-        
+           
     else:
         for post in sub_posts:
-            post_dict['Post_ID'].append(post.id)
-            post_dict['Texte'].append(post.selftext)
-            df_post = pd.DataFrame(post_dict)
+            post_dict['Post_ID'].append(post.id if post.id else "")
+            post_dict['Texte'].append(post.selftext if post.selftext else "")
 
-        # Affichage de la dataframe
-        st.dataframe(df_post)
+    df_post = pd.DataFrame(post_dict)
 
-        return df_post
+    return df_post
 
 
 
@@ -156,12 +158,13 @@ def from_link_get_id(link):
             st.error("Lien invalide. Veuillez entrer un lien de post Reddit complet.")
             post_id = None
 
-
+    return post_id
 
 
 # Extraction des commentaires
 def extract_comment(post):
     comments_dict = {}
+
     post.comments.replace_more(limit=5)
     all_comments = post.comments.list()
 
@@ -180,20 +183,20 @@ def extract_comment(post):
 
 # Extraction des posts depuis une query
 def from_query_get_post(query):
-            subreddit = reddit.subreddit("all")  # Recherche dans tout Reddit, ou spécifie un subreddit
+    subreddit = reddit.subreddit("all")  # Recherche dans tout Reddit, ou spécifie un subreddit
 
-            # Extraire les publications contenant le terme recherché
-            post_dict = {'Auteur': [], 'Texte': []}
-            for submission in subreddit.search(query, limit=10):  # Ajuste le "limit" pour plus ou moins de résultats
-                post_dict['Auteur'].append(submission.author)
+    # Extraire les publications contenant le terme recherché
+    post_dict = {'Auteur': [], 'Texte': []}
+    for submission in subreddit.search(query, limit= None):  # Ajuste le "limit" pour plus ou moins de résultats
+        post_dict['Auteur'].append(submission.author)
 
-                post_dict['Titre'].append(submission.title)
+        post_dict['Titre'].append(submission.title)
 
 
 
-            comment_df = pd.DataFrame(post_dict)
+    comment_df = pd.DataFrame(post_dict)
 
-            return comment_df    
+    return comment_df
 
 
 st.divider()
@@ -211,7 +214,7 @@ choix_extract = st.radio("Veuillez choisir le type d'extraction souhaitez !",
 
 
 # Initialisation variable publication
-df_post = None
+df_post = pd.DataFrame()
 
 st.write(f'Vous avez choisis: {choix_extract}')
 st.divider()
@@ -233,6 +236,7 @@ if choix_extract == 'Publication Subreddit':
     if st.button('Validez'):
 
         if communaute:
+
             st.success('Analyse en cours')
             st.subheader(communaute)
             # Retourne des informations sur la communauté
@@ -329,34 +333,35 @@ st.divider()
 #########################
 
 # Variable texte à analyser
-if df_post:
-    text = df_post['Texte']
+# Détection de la langue basée sur une concaténation des textes
+# Variable texte à analyser
+# Détection de la langue basée sur une concaténation des textes
+if not df_post.empty:
+    # Concaténer tous les textes pour détecter la langue principale
+    concatenated_text = " ".join(df_post['Texte'].dropna().astype(str))
+    lang = detect(concatenated_text)
 
-    nltk.download('stopwords')
-
-    lang = detect(text)
-
+    # Charger les stopwords et le modèle Spacy correspondant
     if lang == 'fr':
         stop_words = stopwords.words('french')
-        nlp = spacy.load('fr_core_nexs_sm', disable=['parser', 'ner'])
-
+        nlp = spacy.load('fr_core_news_sm')  # Assurez-vous que ce modèle est installé
     else:
         stop_words = stopwords.words('english')
-        nlp = spacy.load('en_core_web_sm')
+        nlp = spacy.load('en_core_web_sm')  # Assurez-vous que ce modèle est installé
 
-    # Preprocessing du texte à analyser
+    # Fonction de preprocessing
     def preprocess_text(text):
-        text = re.sub('\s+', ' ', text)  # Remove extra spaces
-        text = re.sub('\S*@\S*\s?', '', text)  # Remove emails
-        text = re.sub('\'', '', text)  # Remove apostrophes
-        text = re.sub('[^a-zA-Z]', ' ', text)  # Remove non-alphabet characters
-        text = text.lower()  # Convert to lowercase
-        return text
+        text = re.sub(r'\s+', ' ', text)  # Supprime les espaces multiples
+        text = re.sub(r'\S*@\S*\s?', '', text)  # Supprime les emails
+        text = re.sub(r"'", '', text)  # Supprime les apostrophes
+        text = re.sub(r'[^\w\sÀ-ÿ]', ' ', text)  # Garde les caractères alphabétiques (incl. accents)
+        text = text.lower()  # Convertit en minuscule
+        return text.strip()
 
-    df_post['cleaned_text'] = df_post['Title'].apply(preprocess_text)  # Replace 'text_column' with your column name
+    # Appliquer le preprocessing
+    df_post['cleaned_text'] = df_post['Texte'].apply(preprocess_text)  # Correction de la colonne utilisée
 
-
-    # Tokenize and retire stopwords
+    # Tokenization et retrait des stopwords
     def tokenize(text):
         tokens = gensim.utils.simple_preprocess(text, deacc=True)
         tokens = [token for token in tokens if token not in stop_words]
@@ -365,7 +370,6 @@ if df_post:
     df_post['tokens'] = df_post['cleaned_text'].apply(tokenize)
 
     # Lemmatization des tokens
-    nlp = spacy.load('fr_core_news_sm', disable=['parser', 'ner'])
     def lemmatize(tokens):
         doc = nlp(" ".join(tokens))
         return [token.lemma_ for token in doc]
@@ -377,20 +381,56 @@ if df_post:
     texts = df_post['lemmas']
     corpus = [id2word.doc2bow(text) for text in texts]
 
-    # LDA model
+    # Paramètres ajustables dans Streamlit
     num_topics = st.slider("Nombre de thèmes à identifier :", min_value=2, max_value=10, value=3)
+    passes = st.slider("Nombre de passes pour LDA :", min_value=1, max_value=20, value=10)
+    chunksize = st.slider("Taille des chunks pour LDA :", min_value=50, max_value=200, value=100)
 
-    lda_model = gensim.models.ldamodel.LdaModel(corpus=corpus,
-                                            id2word=id2word,
-                                            random_state=100,
-                                            update_every=1,
-                                            chunksize=100,
-                                            passes=10,
-                                            alpha='auto',
-                                            per_word_topics=True)
+    # Fonction pour afficher les top mots-clés par sujet
+    def plot_top_keywords(lda_model, num_words=10):
+        topics = []
+        for topic_id, topic_words in lda_model.show_topics(num_topics=-1, num_words=num_words, formatted=False):
+            words = ", ".join([word for word, _ in topic_words])
+            topics.append([f"Topic {topic_id}", words])
+    
+        df_topics = pd.DataFrame(topics, columns=["Topic", "Keywords"])
+        return df_topics
 
-# Génération de la visualisation pyLDAvis
-    if st.button("Afficher la visualisation LDA"):
-        vis_html = pyLDAvis.gensim_models.prepare(lda_model, corpus, id2word)
-        html_string = pyLDAvis.prepared_data_to_html(vis_html)
-        st.components.v1.html(html_string, width=1300, height=800, scrolling=True)
+    # Initialisation de la session d'état pour `lda_model`
+    if 'lda_model' not in st.session_state:
+        st.session_state.lda_model = None
+
+    # Si le modèle LDA n'est pas encore créé, créer un modèle
+    if st.button('Créer le modèle LDA') and st.session_state.lda_model is None:
+        try:
+            st.session_state.lda_model = gensim.models.ldamodel.LdaModel(corpus=corpus,
+                                                   id2word=id2word,
+                                                   num_topics=num_topics,
+                                                   random_state=100,
+                                                   update_every=1,
+                                                   chunksize=chunksize,
+                                                   passes=passes,
+                                                   alpha='auto',
+                                                   per_word_topics=True)
+            st.success("Le modèle LDA a été créé avec succès.")
+            
+            # Affichage des résultats (exemple avec les mots-clés)
+            df_topics = plot_top_keywords(st.session_state.lda_model, num_words=10)
+            st.write(df_topics)
+        except Exception as e:
+            st.error(f"Erreur lors de l'entraînement du modèle LDA : {e}")
+
+    # Vérification si le modèle LDA est déjà disponible dans la session
+    if st.session_state.lda_model:
+        st.write("Le modèle LDA est déjà disponible dans la session.")
+
+        # Visualisation dans Streamlit si le modèle LDA existe
+        if st.button("Afficher les mots-clés des sujets"):
+            df_topics = plot_top_keywords(st.session_state.lda_model, num_words=10)
+            st.write(df_topics)
+
+            # Heatmap pour montrer les scores
+            st.subheader("Visualisation des poids des mots par sujet")
+            plt.figure(figsize=(10, 6))
+            sns.heatmap(pd.DataFrame(st.session_state.lda_model.get_topics()), annot=True, cmap="coolwarm")
+            st.pyplot(plt)
