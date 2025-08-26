@@ -25,18 +25,8 @@ load_dotenv(dotenv_path=dotenv_path)
 
 
 
-st.title('Analyse statistique des subreddit')
-st.write(''' Cette page est un script permettant d'analyser les statistiques concernant une communauté Reddit (autrement dit subreddit) 
-            en particulier. Tout d'abord elle extrait l'ensemble des posts de ce subreddit afin de les implanter dans une dataframe comportant plusieurs variables:
-
-- l'auteur du post
-- le titre du post
-- le texte que le post contient
-- le nombre de commentaire
-- le score du post aussi appelé karma
-- la date de publication
-
-L'algorithme renvoit alors une analyse globale du subreddit. ''')
+st.title('Analyse statistique de subreddit')
+st.write(''' Choisissez la communauté Reddit de votre choix et obtenait une analyses statistiques de son activités.''')
 
 # --- Initialisation de l'accès à l'API ---
 try:
@@ -183,12 +173,10 @@ if subname:
 
         # --- Analyse Statistique ---
         st.header(f'Analyse Statistique de la communauté {communaute}')
-        st.write(f"Voici quelsques informations statistiques")
         stats_analysis(post_reddit)
 
         # Top 5 Auteur
-        st.header('Top 5 Auteur')
-        st.write('Voici les auteurs les auteurs les plus actifs')
+        st.header('Top 5 Auteur les plus actifs')
         print_top5(post_reddit)
 
         # Description Score / Commentaire
@@ -196,8 +184,7 @@ if subname:
         describe_score_comments(post_reddit)
 
         # Rythme de publication dans le temps
-        st.header('Rythme de publication')
-        st.write("Rythme de publication de la communauté")
+        st.header('Rythme de publication de la communauté')
         rythme_publication(post_reddit)
 
 
