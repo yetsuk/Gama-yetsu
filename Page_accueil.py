@@ -32,9 +32,8 @@ st.markdown(
 st.markdown(
     '''
     <div style= 'text-align: center; font-size: 18px; line-height: 1.6;'>
-    Programme d'extraction et d'analyse de post Reddit. L'objectif étant de mieux comprendre les thèmes abordés au sein d'un subreddit ou
-    au cours d'une échange dans les commentaires d'un post. Les méthodes utilisés dans le programme s'inspire des méthodes utilisés lors de la production de mon mémoire de fin d'étude en 
-    Data Science et Société Numérique. Le programme que je réalise se compose de deux parties distinctes:
+    Application d'extraction et d'analyse de publication Reddit utilisant python et praw pour accéder à l'API de Reddit.
+    Possible de réaliser deux types d'analyses.
 
     </div>
     ''',
@@ -54,9 +53,7 @@ with col1:
         """
         <div style="text-align: center; font-size: 18px; line-height: 1.6; margin: 10px 0;">
             <h3>Analyse Descriptive</h3>
-            <p> Analyse de l'activité d'un subreddit (autrement appelé communauté) en relevant diverse information: nombre de post, nombre de commentaire,
-            score de la publication, etc. A cela s'ajoute des informations sur les auteurs de post afin de rendre compte des individus pouvant être influant dans le
-            réseau.</p>
+            <p> Analyse descriptive de l'activité du Subreddit (nombre de post, nombre d'auteur, auteur les plus influents...).</p>
 
         </div>
         """,
@@ -77,8 +74,7 @@ with col3:
         """
         <div style="text-align: center; font-size: 18px; line-height: 1.6; margin: 10px 0;">
             <h3>Analyse Textuelle</h3>
-            <p> Analyse des thèmes abordés au sein d'un subredit, des commentaires ou au sujet d'un élément recherchés comme une simple query.
-            Permet d'obtenir plus d'information sur les sujets abordés et les éléments de langages utilisés.</p>
+            <p> Analyse des publications visibles au sein d'une communauté ou les commentaires d'une publication permettant d'identifié les thèmes abordés.</p>
 
         </div>
         """,
