@@ -3,26 +3,26 @@
 
 # --- Import des modules nécessaire ---
 
-import pandas as pd
-import gensim
-import gensim.corpora as corpora
-import spacy
-import nltk
-from nltk.corpus import stopwords
-import re
-from datetime import datetime
-
-from langdetect import detect 
-
-import pyLDAvis
-import pyLDAvis.gensim_models
-
 import streamlit as st
 import praw
+import pandas as pd
+import numpy as np
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import LatentDirichletAllocation
+import pyLDAvis
+import pyLDAvis.lda_model
+from datetime import datetime
+import streamlit.components.v1 as components
+import re
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+import warnings
 
-import matplotlib.pyplot as plt
-import seaborn as sns
 
+
+warnings.filterwarnings('ignore')
 
 
 
@@ -39,13 +39,17 @@ load_dotenv(dotenv_path=dotenv_path)
 
 
 
-
+st.set_page_config(page_title = "Analyse thématique")
 
 st.title('Analyse textuelle Reddit')
 st.write(''' 
          Désigner le subreddit de votre choix afin d'obtenir une liste de thèmes abordés par les membres
          de la communauté. Il vous suffit juste d'insérer le noms de la communauté, le programme s'occupera
          de l'extraction et de l'analyse des publications. ''')
+
+# --- Initialisation des variables ---
+if 'df_post' not in st.session_state:
+    st.session_state.df_post = None
 
 
 # --- Ajout Instance de connexion Reddit --- 
@@ -66,35 +70,23 @@ except Exception as e:
 ##################################################
 
 
-# Choix du corpus à analyser
-def choix_corpus():
-    list_corpus = ['Titre', 'Contenu de Publication']
-    choix_corpus = st.radio('Veuillez choisir les corpus que vous souhaitez analyser', list_corpus )
-    st.write(f'Vous avez choisis: {choix_corpus}')
 
-""
+
+
 # --- Extraction des publications Reddit ---
-def extract_post(communaute, choix_corpus):
+def extract_post(communaute):
 
     subreddit = reddit.subreddit(communaute)
 
-    corpus = choix_corpus
-
-    sub_posts = subreddit.top(limit = 10)
+    sub_posts = subreddit.top(limit = 1500)
 
     # Création d'un dictionnaire pour stocker les publications
-    post_dict = {'Post_ID' : [], 'Texte' : []}
+    post_dict = {'Post_ID' : [], 'text' : []}
 
-    if corpus == 'Titre':
-        for post in sub_posts:
+    for post in sub_posts:
             post_dict['Post_ID'].append(post.id if post.id else "")
-            post_dict['Texte'].append(post.title if post.title else "")
-
-           
-    else:
-        for post in sub_posts:
-            post_dict['Post_ID'].append(post.id if post.id else "")
-            post_dict['Texte'].append(post.selftext if post.selftext else "")
+            post_dict['text'].append(post.title if post.title else "")
+    
 
     df_post = pd.DataFrame(post_dict)
 
@@ -113,11 +105,6 @@ def display_info(communaute):
 
 
 
-# Affhicher les informations d'une publication
-def display_post_info(post):
-    st.write(post.title)
-    st.write(post.selftext)
-
 
 st.divider()
 
@@ -127,49 +114,28 @@ st.divider()
 
 st.header('A vous de le tester !')
 
-# --- Choix objet d'analyse ---
-
-choix_extract = st.radio("Veuillez choisir le type d'extraction souhaitez !",
-                         ['Publication Subreddit', 'Commentaire', 'Query'])
 
 
-# Initialisation variable publication
+# Sélection et analyse du subreddit choisis
 
-st.write(f'Vous avez choisis: {choix_extract}')
-st.divider()
+communaute = st.text_input("Insérez le noms du Subreddit à analyser", value ="")
+
+if communaute and st.button('Validez'):
+
+    st.success('Extraction des publications en cours')
+    display_info(communaute)
+
+    try:
+        st.session_state.df_post = extract_post(communaute)
+        st.success('Extraction des publications en cours')
 
 
-if choix_extract == 'Publication Subreddit':
-    ## Sélection du type de corpus souhaiter    
-    choix_corpus = st.radio('Veuillez choisir les textes à analyser !', ['Titre', 'Contenu de publication'])
+    except Exception as e:
+        st.error('Erreur lors de la récupération des informations du Subreddit. Veuillez vérifier le nom de la communauté ou réessayer plus tard')
+        st.session_state.df_post = None
 
-    st.write(f"Vous avez choisi d'analyser les {choix_corpus}")
-
-    st.divider()
-
-     # Extraction des publications de subreddit
-    communaute = st.text_input('Veullez écrire le noms du subreddit sans le "r/" !')
-    st.divider()
-
-    # Ajout du bouton de validation
-    if st.button('Validez'):
-
-        if communaute:
-
-            st.success('Analyse en cours')
-            st.subheader(communaute)
-            # Retourne des informations sur la communauté
-            display_info(communaute)
-            try:
-                df_post = extract_post(communaute, choix_corpus)
-
-            except Exception as e:
-                st.error("Erreur lors de la récupération des informations du subreddit. Veuillez vérifier le nom ou réessayer plus tard.")
-
-        
-    else:
-        st.write('Veuillez cliquer sur le bouton pour valider !')
-
+else:
+    st.write('Appuyez sur le boutton pour valider !')        
 
 
 st.divider() 
@@ -177,105 +143,184 @@ st.divider()
 #    Analyse du texte   #
 #########################
 
-# Variable texte à analyser
-# Détection de la langue basée sur une concaténation des textes
-# Variable texte à analyser
-# Détection de la langue basée sur une concaténation des textes
-if not df_post.empty:
-    # Concaténer tous les textes pour détecter la langue principale
-    concatenated_text = " ".join(df_post['Texte'].dropna().astype(str))
-    lang = detect(concatenated_text)
 
-    # Charger les stopwords et le modèle Spacy correspondant
-    if lang == 'fr':
-        stop_words = stopwords.words('french')
-        nlp = spacy.load('fr_core_news_sm')  # Assurez-vous que ce modèle est installé
-    else:
-        stop_words = stopwords.words('english')
-        nlp = spacy.load('en_core_web_sm')  # Assurez-vous que ce modèle est installé
+# Fonction de preprocessing
 
-    # Fonction de preprocessing
-    def preprocess_text(text):
-        text = re.sub(r'\s+', ' ', text)  # Supprime les espaces multiples
-        text = re.sub(r'\S*@\S*\s?', '', text)  # Supprime les emails
-        text = re.sub(r"'", '', text)  # Supprime les apostrophes
-        text = re.sub(r'[^\w\sÀ-ÿ]', ' ', text)  # Garde les caractères alphabétiques (incl. accents)
-        text = text.lower()  # Convertit en minuscule
-        return text.strip()
-
-    # Appliquer le preprocessing
-    df_post['cleaned_text'] = df_post['Texte'].apply(preprocess_text)  # Correction de la colonne utilisée
-
-    # Tokenization et retrait des stopwords
-    def tokenize(text):
-        tokens = gensim.utils.simple_preprocess(text, deacc=True)
-        tokens = [token for token in tokens if token not in stop_words]
-        return tokens
-
-    df_post['tokens'] = df_post['cleaned_text'].apply(tokenize)
-
-    # Lemmatization des tokens
-    def lemmatize(tokens):
-        doc = nlp(" ".join(tokens))
-        return [token.lemma_ for token in doc]
-
-    df_post['lemmas'] = df_post['tokens'].apply(lemmatize)
-
-    # Création dictionnaire et corpus
-    id2word = corpora.Dictionary(df_post['lemmas'])
-    texts = df_post['lemmas']
-    corpus = [id2word.doc2bow(text) for text in texts]
-
-    # Paramètres ajustables dans Streamlit
-    num_topics = st.slider("Nombre de thèmes à identifier :", min_value=2, max_value=10, value=3)
-    passes = st.slider("Nombre de passes pour LDA :", min_value=1, max_value=20, value=10)
-    chunksize = st.slider("Taille des chunks pour LDA :", min_value=50, max_value=200, value=100)
-
-    # Fonction pour afficher les top mots-clés par sujet
-    def plot_top_keywords(lda_model, num_words=10):
-        topics = []
-        for topic_id, topic_words in lda_model.show_topics(num_topics=-1, num_words=num_words, formatted=False):
-            words = ", ".join([word for word, _ in topic_words])
-            topics.append([f"Topic {topic_id}", words])
+@st.cache_data
+def preprocess_text(texts):
+    """Préprocessing des textes pour l'analyse LDA"""
+    try:
+        nltk.download('punkt', quiet=True)
+        nltk.download('stopwords', quiet=True)
+        nltk.download('wordnet', quiet=True)
+    except:
+        pass
     
-        df_topics = pd.DataFrame(topics, columns=["Topic", "Keywords"])
-        return df_topics
+    # Mots vides français et anglais
+    stop_words = set(stopwords.words('french') + stopwords.words('english'))
+    stop_words.update(['le', 'de', 'un', 'à', 'être', 'et', 'en', 'avoir', 'que', 'pour'])
+    
+    lemmatizer = WordNetLemmatizer()
+    processed_texts = []
+    
+    for text in texts:
+        # Conversion en minuscules
+        text = text.lower()
+        # Suppression des caractères spéciaux et chiffres
+        text = re.sub(r'[^a-zA-Zàâäéèêëïîôöùûüÿç\s]', '', text)
+        # Tokenisation
+        tokens = word_tokenize(text)
+        # Suppression des mots vides et lemmatisation
+        tokens = [lemmatizer.lemmatize(token) for token in tokens 
+                 if token not in stop_words and len(token) > 2]
+        processed_texts.append(' '.join(tokens))
+    
+    return processed_texts
 
-    # Initialisation de la session d'état pour `lda_model`
-    if 'lda_model' not in st.session_state:
-        st.session_state.lda_model = None
-
-    # Si le modèle LDA n'est pas encore créé, créer un modèle
-    if st.button('Créer le modèle LDA') and st.session_state.lda_model is None:
-        try:
-            st.session_state.lda_model = gensim.models.ldamodel.LdaModel(corpus=corpus,
-                                                   id2word=id2word,
-                                                   num_topics=num_topics,
-                                                   random_state=100,
-                                                   update_every=1,
-                                                   chunksize=chunksize,
-                                                   passes=passes,
-                                                   alpha='auto',
-                                                   per_word_topics=True)
-            st.success("Le modèle LDA a été créé avec succès.")
+if st.session_state.df_post is not None and not st.session_state.df_post.empty:
+    # Paramètres LDA
+    n_topics = st.sidebar.slider("Nombre de sujets", 2, 10, 5)
+    max_features = st.sidebar.slider("Nombre maximum de mots", 100, 1000, 500)
+    min_df = st.sidebar.slider("Fréquence minimale (min_df)", 1, 5, 2)
+    
+    # Bouton pour lancer l'analyse
+    if st.sidebar.button("🚀 Lancer l'analyse LDA", type="primary"):
+        
+        with st.spinner("🔄 Préprocessing des textes..."):
+            # Préprocessing
+            processed_texts = preprocess_text(st.session_state.df_post['text'].tolist())
+        
+        with st.spinner("🔄 Entraînement du modèle LDA..."):
+            # Vectorisation
+            vectorizer = CountVectorizer(
+                max_features=max_features,
+                min_df=min_df,
+                max_df=0.8,
+                ngram_range=(1, 2)
+            )
             
-            # Affichage des résultats (exemple avec les mots-clés)
-            df_topics = plot_top_keywords(st.session_state.lda_model, num_words=10)
-            st.write(df_topics)
-        except Exception as e:
-            st.error(f"Erreur lors de l'entraînement du modèle LDA : {e}")
+            doc_term_matrix = vectorizer.fit_transform(processed_texts)
+            
+            # Modèle LDA
+            lda_model = LatentDirichletAllocation(
+                n_components=n_topics,
+                random_state=42,
+                max_iter=10,
+                learning_method='online'
+            )
+            
+            lda_model.fit(doc_term_matrix)
+        
+        # Stockage des résultats dans session state
+        st.session_state.lda_results = {
+            'model': lda_model,
+            'vectorizer': vectorizer,
+            'doc_term_matrix': doc_term_matrix,
+            'processed_texts': processed_texts,
+            'original_df': st.session_state.df_post
+        }
+        
+        st.success(" Analyse terminée!")
 
-    # Vérification si le modèle LDA est déjà disponible dans la session
-    if st.session_state.lda_model:
-        st.write("Le modèle LDA est déjà disponible dans la session.")
-
-        # Visualisation dans Streamlit si le modèle LDA existe
-        if st.button("Afficher les mots-clés des sujets"):
-            df_topics = plot_top_keywords(st.session_state.lda_model, num_words=10)
-            st.write(df_topics)
-
-            # Heatmap pour montrer les scores
-            st.subheader("Visualisation des poids des mots par sujet")
-            plt.figure(figsize=(10, 6))
-            sns.heatmap(pd.DataFrame(st.session_state.lda_model.get_topics()), annot=True, cmap="coolwarm")
-            st.pyplot(plt)
+# Affichage des résultats
+if 'lda_results' in st.session_state:
+    results = st.session_state.lda_results
+    
+    # Onglets pour organiser l'affichage
+    tab1, tab2, tab3, tab4 = st.tabs([" Visualisation Interactive", " Sujets Détaillés", " Documents par Sujet", " Métriques"])
+    
+    with tab1:
+        st.subheader("Visualisation Interactive pyLDAvis")
+        
+        with st.spinner(" Génération de la visualisation..."):
+            try:
+                # Génération de la visualisation pyLDAvis
+                vis = pyLDAvis.lda_model.prepare(
+                    results['model'], 
+                    results['doc_term_matrix'], 
+                    results['vectorizer'],
+                    mds='tsne'
+                )
+                
+                # Conversion en HTML
+                html_string = pyLDAvis.prepared_data_to_html(vis)
+                
+                # Affichage dans Streamlit
+                components.html(html_string, width=1200, height=700, scrolling=True)
+                
+            except Exception as e:
+                st.error(f"Erreur lors de la génération de la visualisation: {e}")
+    
+    with tab2:
+        st.subheader(" Analyse des Sujets")
+        
+        # Extraction des mots-clés par sujet
+        feature_names = results['vectorizer'].get_feature_names_out()
+        
+        for topic_idx, topic in enumerate(results['model'].components_):
+            st.write(f"### Sujet {topic_idx + 1}")
+            
+            # Top mots pour ce sujet
+            top_words_idx = topic.argsort()[-10:][::-1]
+            top_words = [feature_names[i] for i in top_words_idx]
+            top_weights = [topic[i] for i in top_words_idx]
+            
+            # Création d'un DataFrame pour l'affichage
+            words_df = pd.DataFrame({
+                'Mot': top_words,
+                'Poids': [f"{w:.3f}" for w in top_weights]
+            })
+            
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.dataframe(words_df, use_container_width=True, hide_index=True)
+            with col2:
+                st.bar_chart(pd.Series(top_weights, index=top_words))
+    
+    with tab3:
+        st.subheader(" Attribution des Documents aux Sujets")
+        
+        # Prédiction des sujets pour chaque document
+        doc_topic_probs = results['model'].transform(results['doc_term_matrix'])
+        
+        # Création d'un DataFrame avec les résultats
+        results_df = results['original_df'].copy()
+        results_df['sujet_principal'] = doc_topic_probs.argmax(axis=1) + 1
+        results_df['probabilite_max'] = doc_topic_probs.max(axis=1)
+        
+        # Ajout des probabilités pour tous les sujets
+        for i in range(doc_topic_probs.shape[1]):
+            results_df[f'prob_sujet_{i+1}'] = doc_topic_probs[:, i]
+        
+        st.dataframe(
+            results_df[['text', 'sujet_principal', 'probabilite_max']].round(3),
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        # Distribution des documents par sujet
+        st.subheader(" Distribution des Documents par Sujet")
+        topic_counts = results_df['sujet_principal'].value_counts().sort_index()
+        st.bar_chart(topic_counts)
+    
+    with tab4:
+        st.subheader(" Métriques du Modèle")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("Nombre de Sujets", n_topics)
+        with col2:
+            st.metric("Nombre de Documents", len(results['original_df']))
+        with col3:
+            st.metric("Vocabulaire", len(results['vectorizer'].get_feature_names_out()))
+        
+        # Calcul de la perplexité
+        perplexity = results['model'].perplexity(results['doc_term_matrix'])
+        log_likelihood = results['model'].score(results['doc_term_matrix'])
+        
+        col4, col5 = st.columns(2)
+        with col4:
+            st.metric("Perplexité", f"{perplexity:.2f}")
+        with col5:
+            st.metric("Log-vraisemblance", f"{log_likelihood:.2f}")
