@@ -1,17 +1,17 @@
+
+# Accès API et page de l'application
 import streamlit as st
 import praw
 
 # Manipulation de donnée
-import numpy as np
 import pandas as pd
 from datetime import datetime
 
 # Visualisation de donnée
-import statsmodels as stats
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import seaborn as sns
-import plotly.express as px
+
+
+
 
 # --- Accès code d'accès API
 from dotenv import load_dotenv ## Accès au fichier .env
@@ -23,7 +23,7 @@ dotenv_path = Path(__file__).resolve().parent.parent / ".env"
 # Charger les variables d'environnement
 load_dotenv(dotenv_path=dotenv_path)
 
-
+st.set_page_config(page_title = 'Analyse Statistique')
 
 st.title('Analyse statistique de subreddit')
 st.write(''' Choisissez la communauté Reddit de votre choix et obtenait une analyses statistiques de son activités.''')

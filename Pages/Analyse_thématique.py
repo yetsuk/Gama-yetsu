@@ -6,7 +6,6 @@
 import streamlit as st
 import praw
 import pandas as pd
-import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
 import pyLDAvis

@@ -74,7 +74,7 @@ with col3:
         """
         <div style="text-align: center; font-size: 18px; line-height: 1.6; margin: 10px 0;">
             <h3>Analyse Textuelle</h3>
-            <p> Analyse des publications visibles au sein d'une communauté ou les commentaires d'une publication permettant d'identifié les thèmes abordés.</p>
+            <p> Analyse des publications visibles au sein d'une communauté permettant d'identifié les thèmes abordés.</p>
 
         </div>
         """,
