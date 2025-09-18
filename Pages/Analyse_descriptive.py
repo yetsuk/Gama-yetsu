@@ -53,7 +53,7 @@ def show_subreddit_header(subreddit):
         
 # --- Extraction des posts ---
 def extract_into_df(subreddit):
-    posts = subreddit.top(limit=100)  
+    posts = subreddit.top(limit=None)  
     posts_dict = {
         'Auteur': [], "Title": [], "Post Text": [], "ID": [],
         "Score": [], "Total Comments": [], "Post URL": [], "Date": []
@@ -132,21 +132,32 @@ def describe_score_comments(top_posts):
 
 # --- Rythme de publication dans le temps ---
 def rythme_publication(top_posts):
-        top_posts['Date'] = pd.to_datetime(top_posts['Date']).dt.to_period('M')
-        df_count = top_posts.groupby('Date').size().reset_index(name='Nombre de posts')
-
-        # Tracer l'évolution du nombre de posts au fil du temps
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.plot(df_count['Date'].astype(str), df_count['Nombre de posts'], marker='o')
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Nombre de posts")
-        ax.set_title("Évolution du nombre de posts Reddit par mois")
-        ax.grid(True)
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-
-        # Afficher le plot
-        st.pyplot(fig)
+    top_posts['Date'] = pd.to_datetime(top_posts['Date']).dt.to_period('M')
+    df_count = top_posts.groupby('Date').size().reset_index(name='Nombre de posts')
+    
+    # Tracer l'évolution du nombre de posts au fil du temps
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.plot(df_count['Date'].astype(str), df_count['Nombre de posts'], marker='o', linewidth=2, markersize=6)
+    ax.set_xlabel("Date", fontsize=12)
+    ax.set_ylabel("Nombre de posts", fontsize=12)
+    ax.set_title("Évolution du nombre de posts Reddit par mois", fontsize=14, fontweight='bold')
+    ax.grid(True, alpha=0.3)
+    
+    # Améliorer la lisibilité de l'axe des abscisses
+    n_ticks = len(df_count)
+    if n_ticks > 12:
+        # Si plus de 12 points, afficher seulement chaque 2ème ou 3ème tick
+        step = max(1, n_ticks // 10)
+        tick_positions = range(0, n_ticks, step)
+        ax.set_xticks(tick_positions)
+        ax.set_xticklabels([df_count['Date'].astype(str).iloc[i] for i in tick_positions])
+    
+    # Rotation et alignement des labels
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    
+    # Afficher le plot
+    st.pyplot(fig)
 
 
 ##############################
