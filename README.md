@@ -24,3 +24,8 @@ L'algortithme extrait les 1500 posts les plus populaire (limite en lien au restr
 A la fin de l'analyse l'algorithme affiche une visualisation interactive donnant accès aux différents thèmes abordés et mots clés associé, une analyse des sujets, la distributions des termes au sein des différents sujets et un descriptif des métrique du modèle.
 
 
+# Installation
+
+
+
+
