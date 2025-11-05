@@ -1,12 +1,7 @@
-
 streamlit
 praw
 pandas
-datetime
 matplotlib
 scikit-learn
 pyLDAvis
-datetime
-re
 nltk
-warnings

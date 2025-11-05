@@ -30,9 +30,9 @@ st.write(''' Choisissez la communauté Reddit de votre choix et obtenait une ana
 
 # --- Initialisation de l'accès à l'API ---
 try:
-    reddit = praw.Reddit(client_id =  os.getenv('client_id'), 
-                     client_secret = os.getenv('client_secret'),
-                     user_agent = os.getenv('user_agent'))
+    reddit = praw.Reddit(client_id =  st.secrets['client_id'], 
+                     client_secret = st.secrets['client_secret'],
+                     user_agent = st.secrets['user_agent'])
     
 except Exception as e:
     st.error("Erreur de connexion à l'API Reddit. Veuillez vérifier vos identifiants.")
