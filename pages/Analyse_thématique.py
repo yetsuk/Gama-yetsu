@@ -23,21 +23,6 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
-
-
-
-# --- Accès code d'accès API
-from dotenv import load_dotenv ## Accès au fichier .env
-import os
-# Chemin vers le fichier .env dans le dossier principal
-from pathlib import Path
-dotenv_path = Path(__file__).resolve().parent.parent / ".env"
-
-# Charger les variables d'environnement
-load_dotenv(dotenv_path=dotenv_path)
-
-
-
 st.set_page_config(page_title = "Analyse thématique")
 
 st.title('Analyse textuelle Reddit')
