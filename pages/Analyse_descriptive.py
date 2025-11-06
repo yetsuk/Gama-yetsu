@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title = 'Analyse Statistique')
 
 st.title('Analyse statistique de subreddit')
-st.write(''' Choisissez la communauté Reddit de votre choix et obtenait une analyses statistiques de son activités.''')
+st.write(''' Choisissez la communauté Reddit de votre choix et obtenait une analyse statistique de son activité.''')
 
 # --- Initialisation de l'accès à l'API ---
 try:
