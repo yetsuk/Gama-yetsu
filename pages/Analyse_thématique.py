@@ -132,7 +132,7 @@ if communaute and st.button('Validez'):
         st.session_state.df_post = None
 
 else:
-    st.write('Appuyez sur le boutton pour valider !')        
+    st.write('Appuyez sur le bouton pour valider !')        
 
 
 st.divider() 
