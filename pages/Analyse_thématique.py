@@ -31,6 +31,20 @@ st.write('''
          de la communauté. Il vous suffit juste d'insérer le noms de la communauté, le programme s'occupera
          de l'extraction et de l'analyse des publications. ''')
 
+@st.cache_resource
+def download_nltk_data():
+    try:
+        nltk.data.find('tokenizers/punkt_tab')
+    except LookupError:
+        nltk.download('punkt_tab', quiet=True)
+    try:
+        nltk.data.find('corpora/stopwords')
+    except LookupError:
+        nltk.download('stopwords', quiet=True)
+
+# Call this before any NLTK operations
+download_nltk_data()
+
 # --- Initialisation des variables ---
 if 'df_post' not in st.session_state:
     st.session_state.df_post = None
