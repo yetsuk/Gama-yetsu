@@ -121,14 +121,15 @@ def describe_score_comments(top_posts):
 # --- Rythme de publication dans le temps ---
 def rythme_publication(top_posts):
     
-    # Convertir directement Period en string
+    # Conversion des dates en Period puis directement de period en string
+    top_posts['Date'] = pd.to_datetime(top_posts['Date']).dt.to_period('M')
     dates_month = top_posts['Date'].astype(str)
     
-    # Créer le DataFrame de comptage
+    # Création du DataFrame de comptage
     df_count = dates_month.value_counts().sort_index().reset_index()
     df_count.columns = ['Date', 'Nombre de posts']
     
-    # Créer le graphique
+    # Création du graphique
     fig = go.Figure()
     
     fig.add_trace(go.Scatter(
