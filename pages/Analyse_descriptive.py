@@ -8,7 +8,7 @@ import pandas as pd
 from datetime import datetime
 
 # Visualisation de donnée
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 
 st.set_page_config(page_title = 'Analyse Statistique')
@@ -37,7 +37,7 @@ def show_subreddit_header(subreddit):
     st.write(f"Nom affiché : {subreddit.display_name}")
     st.write(f"Description : {subreddit.public_description}")
     st.write(f"Date de création : {datetime.fromtimestamp(subreddit.created_utc)}")
-    st.write(f"Le subreddit '{subreddit.display_name}' compte actuellement : {subreddit.subscribers} abonnés.")
+    st.write(f"Le subreddit '{subreddit.display_name}' compte actuellement : {subreddit.subscribers:,} abonnés.".replace(',',' '))
         
 # --- Extraction des posts ---
 def extract_into_df(subreddit):
@@ -76,7 +76,7 @@ def stats_analysis(top_posts):
         statistics = pd.DataFrame({
             'Statistiques': ['Nombre de publications', "Nombre d'auteurs", 'Ratio Publication / Auteur'],
             'Valeurs': [nb_publications, nb_auteurs, ratio_pub_auteur]
-        })
+        }).set_index('Statistiques')
         st.dataframe(statistics)
 
 
@@ -85,8 +85,7 @@ def stats_analysis(top_posts):
 def print_top5(top_posts):
     top_auteurs = top_posts['Auteur'].value_counts().head(5).reset_index()
     top_auteurs.columns = ['Auteur', 'Nombre de publications']
-    st.write('Voici les 5 membres ayant publié le plus')
-    st.dataframe(top_auteurs)
+    st.dataframe(top_auteurs, hide_index=True)
 
 
 # --- Description des variables Score et Total Comments ---
@@ -111,7 +110,8 @@ def describe_score_comments(top_posts):
         ]
 
     # Conversion du dictionnaire en DataFrame
-    combined_stats = pd.DataFrame(stats)
+    combined_stats = pd.DataFrame(stats).set_index('Statistiques')
+    combined_stats = combined_stats.transpose()
 
     # Affichage du tableau combiné
     st.dataframe(combined_stats)
@@ -120,33 +120,52 @@ def describe_score_comments(top_posts):
 
 # --- Rythme de publication dans le temps ---
 def rythme_publication(top_posts):
-    top_posts['Date'] = pd.to_datetime(top_posts['Date']).dt.to_period('M')
-    df_count = top_posts.groupby('Date').size().reset_index(name='Nombre de posts')
     
-    # Tracer l'évolution du nombre de posts au fil du temps
-    fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(df_count['Date'].astype(str), df_count['Nombre de posts'], marker='o', linewidth=2, markersize=6)
-    ax.set_xlabel("Date", fontsize=12)
-    ax.set_ylabel("Nombre de posts", fontsize=12)
-    ax.set_title("Évolution du nombre de posts Reddit par mois", fontsize=14, fontweight='bold')
-    ax.grid(True, alpha=0.3)
+    # Convertir directement Period en string
+    dates_month = top_posts['Date'].astype(str)
     
-    # Améliorer la lisibilité de l'axe des abscisses
-    n_ticks = len(df_count)
-    if n_ticks > 12:
-        # Si plus de 12 points, afficher seulement chaque 2ème ou 3ème tick
-        step = max(1, n_ticks // 10)
-        tick_positions = range(0, n_ticks, step)
-        ax.set_xticks(tick_positions)
-        ax.set_xticklabels([df_count['Date'].astype(str).iloc[i] for i in tick_positions])
+    # Créer le DataFrame de comptage
+    df_count = dates_month.value_counts().sort_index().reset_index()
+    df_count.columns = ['Date', 'Nombre de posts']
     
-    # Rotation et alignement des labels
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
+    # Créer le graphique
+    fig = go.Figure()
     
-    # Afficher le plot
-    st.pyplot(fig)
-
+    fig.add_trace(go.Scatter(
+        x=df_count['Date'],
+        y=df_count['Nombre de posts'],
+        mode='lines+markers',
+        line=dict(width=2, color='#1f77b4'),
+        marker=dict(size=6, color='#1f77b4'),
+        hovertemplate='<b>%{x}</b><br>Posts: %{y}<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title="Évolution du nombre de posts Reddit par mois",
+        xaxis_title="Date",
+        yaxis_title="Nombre de posts",
+        height=600,
+        width=1000,
+        xaxis_tickangle=-45,
+        hovermode='x unified',
+        plot_bgcolor='white'
+    )
+    
+    # Réduire le nombre de ticks si nécessaire
+    if len(df_count) > 12:
+        step = max(1, len(df_count) // 10)
+        fig.update_xaxes(tickmode='array', tickvals=df_count['Date'].iloc[::step])
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Statistiques optionnelles
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total de posts", df_count['Nombre de posts'].sum())
+    with col2:
+        st.metric("Moyenne mensuelle", f"{df_count['Nombre de posts'].mean():.1f}")
+    with col3:
+        st.metric("Mois le plus actif", df_count['Nombre de posts'].max())
 
 ##############################
 # --- Début de l'algorithme
@@ -171,12 +190,16 @@ if subname:
 
 
         # --- Analyse Statistique ---
-        st.header(f'Analyse Statistique de la communauté {communaute}')
-        stats_analysis(post_reddit)
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.header('Statistiques générales')
+            stats_analysis(post_reddit)
 
         # Top 5 Auteur
-        st.header('Top 5 Auteur les plus actifs')
-        print_top5(post_reddit)
+        with col2:
+            st.header('Auteur les plus actifs')
+            print_top5(post_reddit)
 
         # Description Score / Commentaire
         st.header('Description du score et du nombre de commentaire')
